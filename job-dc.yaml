@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: joint-consensus-dc
+  namespace: tipocket-job
+spec:
+  template:
+    metadata:
+      name: joint-consensus-dc
+    spec:
+      containers:
+      - image: hub.pingcap.net/ln/tipocket:joint-dc10
+        name: tipocket
+        command:
+          - sh
+          - '-c'
+          - |
+            /bin/joint-consensus -namespace dc \
+            -hub docker.io \
+            -image-version nightly \
+            -pd-image "hub.pingcap.net/ln/pd:pd-joint" \
+            -purge \
+            -storage-class local-storage \
+            -nemesis="kill_tikv_label,shuffle-region-scheduler,shuffle-leader-scheduler,short_kill_pd_leader,mixed_tikv,mixed_pd,partition_one" \
+            -rows 20000000 \
+            -tikv-replicas 6 \
+            -run-time 240h
+        env:
+        - name: KUBECONFIG
+          value: "/etc/config/kube_config"
+        volumeMounts:
+        - name: kube-config
+          mountPath: /etc/config
+      volumes:
+      - name: kube-config
+        configMap:
+          name: kube-config
+      restartPolicy: Never

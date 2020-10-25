@@ -11,9 +11,9 @@ import (
 	"time"
 
 	persistent_treap "github.com/gengliqi/persistent_treap/persistent_treap"
-	pd "github.com/pingcap/pd/client"
 	"github.com/tikv/client-go/config"
 	"github.com/tikv/client-go/rawkv"
+	pd "github.com/tikv/pd/client"
 
 	"github.com/pingcap/tipocket/pkg/cluster"
 	"github.com/pingcap/tipocket/pkg/core"

@@ -4,15 +4,18 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"strings"
 	"time"
 
-	"github.com/ngaut/log"
 	chaosv1alpha1 "github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
+	"github.com/ngaut/log"
+	"github.com/pingcap/tidb-operator/pkg/apis/pingcap/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/pingcap/tipocket/pkg/cluster"
 	"github.com/pingcap/tipocket/pkg/core"
+	"github.com/pingcap/tipocket/pkg/util/pdutil"
 )
 
 const (
@@ -69,6 +72,12 @@ func (g killGenerator) Generate(nodes []cluster.Node) []*core.NemesisOperation {
 	case "kill_dm_1node":
 		n = 1
 		cmp := cluster.DM
+		component = &cmp
+	case "kill_tikv_label":
+		nodesGroup := findStoreLabel(nodes)
+		nodes = *nodesGroup[rand.Intn(len(nodesGroup))]
+		n = len(nodes)
+		cmp := cluster.TiKV
 		component = &cmp
 	default:
 		n = 1
@@ -216,5 +225,63 @@ func findPDMember(nodes []cluster.Node, ifLeader bool) []cluster.Node {
 		}
 	}
 
+	return result
+}
+
+func findStoreLabel(nodes []cluster.Node) []*[]cluster.Node {
+	storeLabels := make(map[string]map[string]*[]cluster.Node)
+	var nodesGroup []*[]cluster.Node
+	pdNodes := findPDMember(nodes, true)
+	if len(pdNodes) == 0 {
+		return nil
+	}
+	pdClient := pdutil.NewPDClient(http.DefaultClient, fmt.Sprintf("http://%s:%d", pdNodes[0].IP, pdNodes[0].Port))
+	stores, _ := pdClient.GetStores()
+	storeMap := storeIDToNodeMapping(nodes)
+	log.Info("[joint consensus] Get store map", storeMap)
+	for _, s := range stores.Stores {
+		for _, label := range s.Labels {
+			if n, ok := storeMap[fmt.Sprintf("%d", s.GetId())]; ok {
+				if _, ok := storeLabels[label.Key]; !ok {
+					storeLabels[label.Key] = make(map[string]*[]cluster.Node)
+				}
+				if _, ok := storeLabels[label.Key][label.Value]; !ok {
+					group := make([]cluster.Node, 0)
+					storeLabels[label.Key][label.Value] = &group
+					nodesGroup = append(nodesGroup, &group)
+				}
+				*storeLabels[label.Key][label.Value] = append(*storeLabels[label.Key][label.Value], n)
+			}
+		}
+	}
+	for _, ng := range nodesGroup {
+		log.Info("[joint consensus] Get nodes group", *ng)
+	}
+	return nodesGroup
+}
+
+func storeIDToNodeMapping(nodes []cluster.Node) map[string]cluster.Node {
+	var (
+		stores []v1alpha1.TiKVStore
+		err    error
+	)
+	nodes = filterComponent(nodes, cluster.TiKV)
+	for _, node := range nodes {
+		if node.Client != nil {
+			stores, err = node.TiKVStore()
+			if err != nil {
+				log.Fatalf("find pd members occurred an error: %+v", err)
+			}
+			break
+		}
+	}
+	result := make(map[string]cluster.Node)
+	for _, node := range nodes {
+		for _, store := range stores {
+			if node.PodName == store.PodName {
+				result[store.ID] = node
+			}
+		}
+	}
 	return result
 }

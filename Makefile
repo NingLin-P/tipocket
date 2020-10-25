@@ -15,9 +15,12 @@ DOCKER_REGISTRY_PREFIX := $(if $(DOCKER_REGISTRY),$(DOCKER_REGISTRY)/,)
 
 default: tidy fmt lint build
 
-build: manager consistency isolation pocket on-dup sqllogic block-writer \
-		region-available deadlock-detector crud abtest cdc-pocket tiflash-pocket \
-		read-stress  tiflash-abtest tiflash-cdc dm-pocket follower-read resolve-lock
+build: joint-consensus
+
+# build: manager consistency isolation pocket on-dup sqllogic block-writer \
+# 		region-available deadlock-detector crud abtest cdc-pocket tiflash-pocket \
+# 		read-stress  tiflash-abtest tiflash-cdc dm-pocket follower-read resolve-lock \
+# 		joint-consensus
 
 consistency: bank bank2 pbank vbank ledger rawkv-linearizability tpcc txn-rand-pessimistic
 
@@ -112,6 +115,9 @@ dm-pocket:
 
 follower-read:
 	$(GOBUILD) $(GOMOD) -o bin/follower-read cmd/follower-read/*.go
+
+joint-consensus:
+	$(GOBUILD) $(GOMOD) -o bin/joint-consensus cmd/joint-consensus/*.go
 
 titan:
 	$(GOBUILD) $(GOMOD) -o bin/titan cmd/titan/*.go

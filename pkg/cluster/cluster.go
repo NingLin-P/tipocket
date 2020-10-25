@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pingcap/tidb-operator/pkg/apis/pingcap/v1alpha1"
 	"github.com/pingcap/tipocket/pkg/test-infra/fixture"
 )
 
@@ -37,14 +38,20 @@ const (
 
 // Client provides useful methods about cluster
 type Client struct {
-	Namespace    string
-	ClusterName  string
-	PDMemberFunc func(ns, name string) (string, []string, error)
+	Namespace     string
+	ClusterName   string
+	PDMemberFunc  func(ns, name string) (string, []string, error)
+	TiKVStoreFunc func(ns, name string) ([]v1alpha1.TiKVStore, error)
 }
 
 // PDMember ...
 func (c *Client) PDMember() (string, []string, error) {
 	return c.PDMemberFunc(c.Namespace, c.ClusterName)
+}
+
+// TiKVStore ...
+func (c *Client) TiKVStore() ([]v1alpha1.TiKVStore, error) {
+	return c.TiKVStoreFunc(c.Namespace, c.ClusterName)
 }
 
 // Node is the cluster endpoint in K8s, it's maybe podIP:port or CLUSTER-IP:port

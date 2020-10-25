@@ -442,6 +442,37 @@ func (o *Ops) GetPDMember(namespace, name string) (string, []string, error) {
 	return local.Status.PD.Leader.Name, members, nil
 }
 
+// GetTiKVStore ...
+func (o *Ops) GetTiKVStore(namespace, name string) ([]v1alpha1.TiKVStore, error) {
+	var local v1alpha1.TidbCluster
+	var stores []v1alpha1.TiKVStore
+	err := wait.PollImmediate(5*time.Second, time.Minute*time.Duration(5), func() (bool, error) {
+		key := types.NamespacedName{
+			Namespace: namespace,
+			Name:      name,
+		}
+		err := o.cli.Get(context.TODO(), key, &local)
+		if err != nil && errors.IsNotFound(err) {
+			return false, err
+		}
+		if err != nil {
+			log.Warningf("error getting TidbOps: %v", err)
+			return false, nil
+		}
+		if local.Status.TiKV.StatefulSet == nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range local.Status.TiKV.Stores {
+		stores = append(stores, s)
+	}
+	return stores, nil
+}
+
 func getTidbDiscoveryService(tc *v1alpha1.TidbCluster) *corev1.Service {
 	meta, l := getDiscoveryMeta(tc)
 	return &corev1.Service{
@@ -614,6 +645,9 @@ func (o *Ops) parseNodeFromPodList(pods *corev1.PodList) []cluster.Node {
 				ClusterName: pod.ObjectMeta.Labels["app.kubernetes.io/instance"],
 				PDMemberFunc: func(ns, name string) (string, []string, error) {
 					return o.GetPDMember(ns, name)
+				},
+				TiKVStoreFunc: func(ns, name string) ([]v1alpha1.TiKVStore, error) {
+					return o.GetTiKVStore(ns, name)
 				},
 			},
 		})

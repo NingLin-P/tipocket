@@ -7,9 +7,9 @@ import (
 	"math/rand"
 	"time"
 
-	pd "github.com/pingcap/pd/client"
 	"github.com/tikv/client-go/config"
 	"github.com/tikv/client-go/rawkv"
+	pd "github.com/tikv/pd/client"
 
 	"github.com/ngaut/log"
 
